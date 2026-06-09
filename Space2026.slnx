@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Space2026.Console/Space2026.Console.csproj" />
+  <Project Path="Space2026.Core/Space2026.Core.csproj" />
+  <Project Path="Space2026.Tests/Space2026.Tests.csproj" />
+</Solution>
