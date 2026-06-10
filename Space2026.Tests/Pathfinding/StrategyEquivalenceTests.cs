@@ -10,7 +10,9 @@ public class StrategyEquivalenceTests
     public static TheoryData<IPathfindingStrategy> WeightedStrategies => new()
     {
         new DijkstraStrategy(),
-        new AStarStrategy()
+        new AStarStrategy(),
+        new OptimizedDijkstraStrategy(),
+        new OptimizedAStarStrategy()
     };
 
     [Theory]
