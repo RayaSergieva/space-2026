@@ -16,4 +16,13 @@ internal static class TestMaps
         "S1 X 0 S2\n" +
         "X X 0 0\n" +
         "0 0 0 F";
+
+    /// <summary>
+    /// A straight line of debris between S1 and F with an open detour below.
+    /// Fewest-moves route goes through the debris (total cost 7); the cheapest
+    /// route takes the longer open detour (total cost 6).
+    /// </summary>
+    public const string DebrisCorridor =
+        "S1 D D D F\n" +
+        "0 0 0 0 0";
 }

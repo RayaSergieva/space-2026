@@ -2,7 +2,6 @@
 using Space2026.Core.Navigation;
 using Space2026.Core.Parsing;
 using Space2026.Core.Pathfinding;
-using Space2026.Core.Reporting;
 
 namespace Space2026.Console;
 
@@ -15,9 +14,9 @@ internal sealed class MissionConsole
 {
     private readonly MapParser _parser = new();
 
-    // Dijkstra will replace this default in Phase 6; the menu will let the
-    // user swap strategies in Phase 7. Held as the interface on purpose.
-    private IPathfindingStrategy _strategy = new BreadthFirstSearchStrategy();
+    // Dijkstra is the default — optimal on weighted terrain (debris costs 2).
+    // Held as the interface so Phase 7's menu picker can swap algorithms freely.
+    private IPathfindingStrategy _strategy = new DijkstraStrategy();
 
     public void Run()
     {
