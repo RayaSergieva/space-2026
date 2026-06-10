@@ -1,4 +1,5 @@
-﻿using Space2026.Core.Models;
+﻿using Space2026.Core.Generation;
+using Space2026.Core.Models;
 using Space2026.Core.Navigation;
 using Space2026.Core.Parsing;
 using Space2026.Core.Pathfinding;
@@ -35,13 +36,14 @@ internal sealed class MissionConsole
                     case "1": RunMission(LoadSampleMap()); break;
                     case "2": RunMission(LoadMapFromFile()); break;
                     case "3": RunMission(EnterMapManually()); break;
-                    case "4": ChooseAlgorithm(); break;
-                    case "5":
+                    case "4": RunMission(GenerateRandomMap()); break;
+                    case "5": ChooseAlgorithm(); break;
+                    case "6":
                         System.Console.WriteLine();
                         System.Console.WriteLine("Safe travels, commander.");
                         return;
                     default:
-                        System.Console.WriteLine("Unknown option — please choose 1-5.");
+                        System.Console.WriteLine("Unknown option — please choose 1-6.");
                         break;
                 }
             }
@@ -61,9 +63,37 @@ internal sealed class MissionConsole
         System.Console.WriteLine("  1) Run the sample mission (from the brief)");
         System.Console.WriteLine("  2) Load a map from a file");
         System.Console.WriteLine("  3) Enter a map manually");
-        System.Console.WriteLine($"  4) Choose algorithm  (current: {_strategy.Name})");
-        System.Console.WriteLine("  5) Exit");
+        System.Console.WriteLine("  4) Generate a random map");
+        System.Console.WriteLine($"  5) Choose algorithm  (current: {_strategy.Name})");
+        System.Console.WriteLine("  6) Exit");
         System.Console.Write("> ");
+    }
+
+    private Grid GenerateRandomMap()
+    {
+        System.Console.Write("Rows (M): ");
+        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+        System.Console.Write("Columns (N): ");
+        var cols = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+        System.Console.Write("Astronauts (1-3): ");
+        var count = ReadInt(1, MapParser.MaxAstronauts);
+        System.Console.Write("Asteroid density % (0-60): ");
+        var asteroidPct = ReadInt(0, 60);
+        System.Console.Write("Debris density % (0-30): ");
+        var debrisPct = ReadInt(0, 30);
+
+        try
+        {
+            return new RandomMapGenerator().Generate(
+                rows, cols, count, asteroidPct / 100.0, debrisPct / 100.0, ensureSolvable: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Core reports "couldn't generate a solvable map" as a program
+            // condition; at the console edge it's a user-fixable input issue,
+            // so translate it into the friendly error channel.
+            throw new MapValidationException(ex.Message);
+        }
     }
 
     private void ChooseAlgorithm()
