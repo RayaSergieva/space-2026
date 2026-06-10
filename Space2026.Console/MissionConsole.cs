@@ -103,16 +103,17 @@ internal sealed class MissionConsole
 
     private Grid GenerateRandomMap()
     {
-        System.Console.Write("Rows (M): ");
-        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
-        System.Console.Write("Columns (N): ");
-        var cols = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
-        System.Console.Write("Astronauts (1-3): ");
-        var count = ReadInt(1, MapParser.MaxAstronauts);
-        System.Console.Write("Asteroid density % (0-60): ");
-        var asteroidPct = ReadInt(0, 60);
-        System.Console.Write("Debris density % (0-30): ");
-        var debrisPct = ReadInt(0, 30);
+        System.Console.WriteLine("Press Enter at any prompt to accept the default.");
+        System.Console.Write("Rows (M) [10]: ");
+        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
+        System.Console.Write("Columns (N) [10]: ");
+        var cols = ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
+        System.Console.Write("Astronauts (1-3) [2]: ");
+        var count = ReadInt(1, MapParser.MaxAstronauts, defaultValue: 2);
+        System.Console.Write("Asteroid density % (0-60) [25]: ");
+        var asteroidPct = ReadInt(0, 60, defaultValue: 25);
+        System.Console.Write("Debris density % (0-30) [10]: ");
+        var debrisPct = ReadInt(0, 30, defaultValue: 10);
 
         try
         {
@@ -295,6 +296,21 @@ internal sealed class MissionConsole
                 return value;
 
             System.Console.Write($"Please enter a whole number between {min} and {max}: ");
+        }
+    }
+
+    private static int ReadInt(int min, int max, int defaultValue)
+    {
+        while (true)
+        {
+            var input = (System.Console.ReadLine() ?? "").Trim();
+            if (input.Length == 0)
+                return defaultValue;
+
+            if (int.TryParse(input, out var value) && value >= min && value <= max)
+                return value;
+
+            System.Console.Write($"Please enter a whole number between {min} and {max} (or Enter for {defaultValue}): ");
         }
     }
 }
