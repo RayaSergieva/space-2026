@@ -5,13 +5,17 @@ using Space2026.Core.Pathfinding;
 namespace Space2026.Console;
 
 /// <summary>
-/// Console-only presentation: prints missions with colour so the map reads at
-/// a glance — asteroids dark red, debris dark yellow, astronauts cyan, the
-/// station green and the route a bright yellow '*'. Core's MapRenderer stays
-/// plain-text; colour is strictly an edge concern of this project.
+/// Console-only presentation: prints missions with colour, and traces each
+/// route star by star like a live plot from mission control. The animation
+/// redraws the whole map per frame instead of repositioning the cursor into
+/// individual cells — redrawing is immune to console scrolling, which made
+/// the previous cell-poking approach crash once output filled the window.
+/// Animation is skipped when output is redirected (pipes, files, CI).
 /// </summary>
 internal static class ConsoleRenderer
 {
+    private const int TraceDelayMilliseconds = 350;
+
     public static void PrintMissions(Grid grid, IReadOnlyList<MissionResult> results)
     {
         foreach (var failure in results.Where(r => !r.Succeeded))
@@ -30,10 +34,51 @@ internal static class ConsoleRenderer
 
     private static void PrintGrid(Grid grid, PathResult path)
     {
-        var overlay = path.Path.Count > 2
-            ? new HashSet<Position>(path.Path.Skip(1).Take(path.Path.Count - 2))
-            : new HashSet<Position>();
+        var interior = path.Path.Count > 2
+            ? path.Path.Skip(1).Take(path.Path.Count - 2).ToList()
+            : new List<Position>();
 
+        if (System.Console.IsOutputRedirected || interior.Count == 0)
+        {
+            DrawFrame(grid, new HashSet<Position>(interior));
+            return;
+        }
+
+        try
+        {
+            AnimateTrace(grid, interior);
+        }
+        catch (Exception)
+        {
+            // Terminals that disallow cursor control must never crash the app;
+            // fall back to printing the finished map.
+            DrawFrame(grid, new HashSet<Position>(interior));
+        }
+    }
+
+    private static void AnimateTrace(Grid grid, List<Position> interior)
+    {
+        var revealed = new HashSet<Position>();
+
+        // Frame 0: the map with no route yet.
+        var frameTop = System.Console.CursorTop;
+        DrawFrame(grid, revealed);
+
+        foreach (var position in interior)
+        {
+            Thread.Sleep(TraceDelayMilliseconds);
+            revealed.Add(position);
+
+            // If output scrolled, the map's first row moved up; re-measure it
+            // from where the cursor now is (one map-height above).
+            frameTop = Math.Max(0, System.Console.CursorTop - grid.Rows);
+            System.Console.SetCursorPosition(0, frameTop);
+            DrawFrame(grid, revealed);
+        }
+    }
+
+    private static void DrawFrame(Grid grid, HashSet<Position> overlay)
+    {
         for (var r = 0; r < grid.Rows; r++)
         {
             for (var c = 0; c < grid.Columns; c++)
@@ -42,11 +87,10 @@ internal static class ConsoleRenderer
 
                 var position = new Position(r, c);
                 if (overlay.Contains(position))
-                    Write("*", ConsoleColor.Yellow);
+                    Write("*".PadRight(2), ConsoleColor.Yellow);
                 else
-                    Write(grid.SymbolAt(position), ColourFor(grid, position));
+                    Write(grid.SymbolAt(position).PadRight(2), ColourFor(grid, position));
             }
-
             System.Console.WriteLine();
         }
     }
@@ -59,9 +103,9 @@ internal static class ConsoleRenderer
 
         return grid.TerrainAt(position) switch
         {
-            CellType.Asteroid => ConsoleColor.DarkRed,
-            CellType.Debris => ConsoleColor.DarkYellow,
-            _ => ConsoleColor.DarkGray
+            CellType.Asteroid => ConsoleColor.Red,
+            CellType.Debris => ConsoleColor.Yellow,
+            _ => ConsoleColor.Gray
         };
     }
 
