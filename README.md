@@ -33,9 +33,7 @@ design.
 
 ## 🎬 Demo
 
-<!-- Record the console with ScreenToGif, save as docs/demo.gif, then uncomment:
 ![The route tracing itself across the asteroid field](docs/demo.gif)
--->
 
 Run the sample mission and watch each route trace itself across the asteroid
 field, star by star. Then answer `y` to the email prompt and the report
