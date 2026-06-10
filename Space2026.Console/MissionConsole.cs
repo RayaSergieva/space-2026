@@ -3,6 +3,7 @@ using Space2026.Core.Models;
 using Space2026.Core.Navigation;
 using Space2026.Core.Parsing;
 using Space2026.Core.Pathfinding;
+using Space2026.Core.Reporting;
 
 namespace Space2026.Console;
 
@@ -166,6 +167,55 @@ internal sealed class MissionConsole
         var results = navigation.PlanMissions(grid);
 
         ConsoleRenderer.PrintMissions(grid, results);
+        OfferEmail(grid, results);
+    }
+
+    private void OfferEmail(Grid grid, IReadOnlyList<MissionResult> results)
+    {
+        System.Console.Write("Email this report to mission control? (y/N): ");
+        var answer = (System.Console.ReadLine() ?? "").Trim();
+        if (!answer.StartsWith("y", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        try
+        {
+            System.Console.Write("  Sender email: ");
+            var sender = (System.Console.ReadLine() ?? "").Trim();
+
+            System.Console.Write("  Sender password (Gmail requires an app password, not your real one): ");
+            var password = ReadPassword();
+
+            System.Console.Write("  Receiver email: ");
+            var receiver = (System.Console.ReadLine() ?? "").Trim();
+
+            using var reporter = new EmailMissionReporter(sender, password, receiver);
+            reporter.Send("SPACE 2026 - Mission Report",
+                            HtmlReportBuilder.Build(grid, results, _strategy.Name), isHtml: true);
+
+            System.Console.WriteLine("  Report transmitted to mission control.");
+        }
+        catch (Exception ex)
+        {
+            // Network/auth failures shouldn't crash the app — report and return.
+            System.Console.WriteLine($"  Could not send email: {ex.Message}");
+        }
+    }
+
+    private static string ReadPassword()
+    {
+        var password = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = System.Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter) { System.Console.WriteLine(); break; }
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (password.Length > 0) password.Remove(password.Length - 1, 1);
+                continue;
+            }
+            if (!char.IsControl(key.KeyChar)) password.Append(key.KeyChar);
+        }
+        return password.ToString();
     }
 
     private static int ReadInt(int min, int max)
