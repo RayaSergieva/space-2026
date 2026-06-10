@@ -74,7 +74,8 @@ Or open `Space2026.slnx` in Visual Studio 2026 and run `Space2026.Console`.
 3. **Enter a map manually** - declare M and N, then type the rows; every
    mission rule is validated with a message naming the exact problem.
 4. **Generate a random map** - choose size, astronaut count and obstacle
-   densities; generation re-rolls until astronaut S1 has a guaranteed route.
+   densities, or just press Enter at each prompt to accept sensible
+   defaults; generation re-rolls until astronaut S1 has a guaranteed route.
 5. **Choose algorithm** - swap between five implementations (BFS, Dijkstra,
    A*, and the flat-array optimized pair) at runtime and watch them agree
    (or, on debris, disagree) about the route.
