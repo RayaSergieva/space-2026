@@ -115,7 +115,7 @@ internal sealed class MissionConsole
         var navigation = new NavigationService(_strategy);
         var results = navigation.PlanMissions(grid);
 
-        System.Console.WriteLine(MissionReportBuilder.Build(grid, results));
+        ConsoleRenderer.PrintMissions(grid, results);
     }
 
     private static int ReadInt(int min, int max)
