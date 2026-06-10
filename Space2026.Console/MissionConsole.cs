@@ -1,4 +1,5 @@
-﻿using Space2026.Core.Generation;
+﻿using System.Diagnostics;
+using Space2026.Core.Generation;
 using Space2026.Core.Models;
 using Space2026.Core.Navigation;
 using Space2026.Core.Parsing;
@@ -10,13 +11,13 @@ namespace Space2026.Console;
 /// <summary>
 /// The interactive console application: shows the menu, gathers maps from the
 /// user, runs missions through the Core services and prints the report.
-/// Pure presentation — all mission logic lives in Space2026.Core.
+/// Pure presentation - all mission logic lives in Space2026.Core.
 /// </summary>
 internal sealed class MissionConsole
 {
     private readonly MapParser _parser = new();
 
-    // Dijkstra is the default — optimal on weighted terrain (debris costs 2).
+    // Dijkstra is the default - optimal on weighted terrain (debris costs 2).
     // Held as the interface so the menu picker can swap algorithms freely.
     private IPathfindingStrategy _strategy = new DijkstraStrategy();
 
@@ -39,12 +40,13 @@ internal sealed class MissionConsole
                     case "3": RunMission(EnterMapManually()); break;
                     case "4": RunMission(GenerateRandomMap()); break;
                     case "5": ChooseAlgorithm(); break;
-                    case "6":
+                    case "6": RunBenchmark(); break;
+                    case "7":
                         System.Console.WriteLine();
                         System.Console.WriteLine("Safe travels, commander.");
                         return;
                     default:
-                        System.Console.WriteLine("Unknown option — please choose 1-6.");
+                        System.Console.WriteLine("Unknown option — please choose 1-7.");
                         break;
                 }
             }
@@ -66,8 +68,37 @@ internal sealed class MissionConsole
         System.Console.WriteLine("  3) Enter a map manually");
         System.Console.WriteLine("  4) Generate a random map");
         System.Console.WriteLine($"  5) Choose algorithm  (current: {_strategy.Name})");
-        System.Console.WriteLine("  6) Exit");
+        System.Console.WriteLine("  6) Benchmark the algorithms");
+        System.Console.WriteLine("  7) Exit");
         System.Console.Write("> ");
+    }
+
+    private Grid EnterMapManually()
+    {
+        System.Console.Write("Number of rows (M): ");
+        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+
+        System.Console.Write("Number of columns (N): ");
+        var columns = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+
+        System.Console.WriteLine($"Enter {rows} rows of {columns} space-separated symbols (S1-S3, F, O or 0, X, D):");
+
+        var lines = new List<string>(rows);
+        for (var i = 0; i < rows; i++)
+        {
+            System.Console.Write($"  row {i + 1}: ");
+            lines.Add(System.Console.ReadLine() ?? "");
+        }
+
+        var grid = _parser.Parse(lines);
+
+        // The parser derives the width from the rows; cross-check it against
+        // the N the user declared, per the brief's input contract.
+        if (grid.Columns != columns)
+            throw new MapValidationException(
+                $"You declared {columns} columns but the map has {grid.Columns}. Please re-enter the map.");
+
+        return grid;
     }
 
     private Grid GenerateRandomMap()
@@ -102,7 +133,9 @@ internal sealed class MissionConsole
         var options = new IPathfindingStrategy[]
         {
             new DijkstraStrategy(),
+            new OptimizedDijkstraStrategy(),
             new AStarStrategy(),
+            new OptimizedAStarStrategy(),
             new BreadthFirstSearchStrategy()
         };
 
@@ -114,6 +147,59 @@ internal sealed class MissionConsole
         var choice = ReadInt(1, options.Length);
         _strategy = options[choice - 1];
         System.Console.WriteLine($"Algorithm set to {_strategy.Name}.");
+    }
+
+    private static void RunBenchmark()
+    {
+        const int iterations = 200;
+
+        System.Console.WriteLine();
+        System.Console.WriteLine("Benchmark: seeded 100x100 map, 25% asteroids, 10% debris, 200 runs per algorithm.");
+        System.Console.WriteLine("Generating the map and warming up the JIT...");
+
+        var grid = new RandomMapGenerator(seed: 2026).Generate(
+            rows: 100, columns: 100, astronautCount: 1,
+            asteroidDensity: 0.25, debrisDensity: 0.10, ensureSolvable: true);
+        var start = grid.Astronauts[0].Start;
+
+        var strategies = new IPathfindingStrategy[]
+        {
+            new BreadthFirstSearchStrategy(),
+            new DijkstraStrategy(),
+            new AStarStrategy(),
+            new OptimizedDijkstraStrategy(),
+            new OptimizedAStarStrategy()
+        };
+
+        // Warm-up so the JIT compiles every code path before timing starts.
+        foreach (var strategy in strategies)
+            strategy.FindShortestPath(grid, start, grid.Station);
+
+        var measurements = new List<(string Name, double Microseconds, int Cost)>();
+        foreach (var strategy in strategies)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            var stopwatch = Stopwatch.StartNew();
+            var cost = 0;
+            for (var i = 0; i < iterations; i++)
+                cost = strategy.FindShortestPath(grid, start, grid.Station).Cost;
+            stopwatch.Stop();
+
+            measurements.Add((strategy.Name, stopwatch.Elapsed.TotalMicroseconds / iterations, cost));
+        }
+
+        var baseline = measurements[1].Microseconds; // standard Dijkstra
+
+        System.Console.WriteLine();
+        System.Console.WriteLine($"{"Algorithm",-36}{"Avg / run",12}{"Speed vs Dijkstra",20}{"Path cost",12}");
+        foreach (var (name, microseconds, cost) in measurements)
+            System.Console.WriteLine($"{name,-36}{microseconds,9:F1} us{baseline / microseconds,18:F2}x{cost,12}");
+
+        System.Console.WriteLine();
+        System.Console.WriteLine("Higher x = faster. BFS may show a higher cost: it minimises moves, not cost.");
+        System.Console.WriteLine("Indicative Stopwatch figures; BenchmarkDotNet is the rigorous tool for production work.");
     }
 
     private Grid LoadSampleMap()
@@ -138,23 +224,6 @@ internal sealed class MissionConsole
             throw new MapValidationException($"File not found: {path}");
 
         return _parser.Parse(File.ReadAllText(path));
-    }
-
-    private Grid EnterMapManually()
-    {
-        System.Console.Write("Number of rows (M): ");
-        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
-
-        System.Console.WriteLine($"Enter {rows} rows of space-separated symbols (S1-S3, F, O or 0, X, D):");
-
-        var lines = new List<string>(rows);
-        for (var i = 0; i < rows; i++)
-        {
-            System.Console.Write($"  row {i + 1}: ");
-            lines.Add(System.Console.ReadLine() ?? "");
-        }
-
-        return _parser.Parse(lines);
     }
 
     private void RunMission(Grid grid)
@@ -190,13 +259,13 @@ internal sealed class MissionConsole
 
             using var reporter = new EmailMissionReporter(sender, password, receiver);
             reporter.Send("SPACE 2026 - Mission Report",
-                            HtmlReportBuilder.Build(grid, results, _strategy.Name), isHtml: true);
+                HtmlReportBuilder.Build(grid, results, _strategy.Name), isHtml: true);
 
             System.Console.WriteLine("  Report transmitted to mission control.");
         }
         catch (Exception ex)
         {
-            // Network/auth failures shouldn't crash the app — report and return.
+            // Network/auth failures shouldn't crash the app - report and return.
             System.Console.WriteLine($"  Could not send email: {ex.Message}");
         }
     }
