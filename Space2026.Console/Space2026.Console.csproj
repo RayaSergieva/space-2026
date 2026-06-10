@@ -11,4 +11,13 @@
     <ProjectReference Include="..\Space2026.Core\Space2026.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Maps\" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<None Update="Maps\sample.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 </Project>

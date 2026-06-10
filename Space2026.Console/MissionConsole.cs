@@ -34,13 +34,14 @@ internal sealed class MissionConsole
                 switch (choice)
                 {
                     case "1": RunMission(LoadSampleMap()); break;
-                    case "2": RunMission(EnterMapManually()); break;
-                    case "3":
+                    case "2": RunMission(LoadMapFromFile()); break;
+                    case "3": RunMission(EnterMapManually()); break;
+                    case "4":
                         System.Console.WriteLine();
                         System.Console.WriteLine("Safe travels, commander.");
                         return;
                     default:
-                        System.Console.WriteLine("Unknown option — please choose 1-3.");
+                        System.Console.WriteLine("Unknown option — please choose 1-4.");
                         break;
                 }
             }
@@ -58,21 +59,34 @@ internal sealed class MissionConsole
         System.Console.WriteLine();
         System.Console.WriteLine("Choose an option:");
         System.Console.WriteLine("  1) Run the sample mission (from the brief)");
-        System.Console.WriteLine("  2) Enter a map manually");
-        System.Console.WriteLine("  3) Exit");
+        System.Console.WriteLine("  2) Load a map from a file");
+        System.Console.WriteLine("  3) Enter a map manually");
+        System.Console.WriteLine("  4) Exit");
         System.Console.Write("> ");
     }
 
     private Grid LoadSampleMap()
     {
-        const string missionMap =
-            "S1 0 X 0 0 0 S2\n" +
-            "X 0 0 0 0 X 0\n" +
-            "X X 0 X 0 X 0\n" +
-            "0 X X 0 0 X 0\n" +
-            "0 X X 0 0 0 F";
+        var path = Path.Combine(AppContext.BaseDirectory, "Maps", "sample.txt");
+        if (!File.Exists(path))
+            throw new MapValidationException(
+                "The bundled sample map is missing. Expected it at: " + path);
 
-        return _parser.Parse(missionMap);
+        return _parser.Parse(File.ReadAllText(path));
+    }
+
+    private Grid LoadMapFromFile()
+    {
+        System.Console.Write("Path to map file: ");
+        var path = (System.Console.ReadLine() ?? "").Trim().Trim('"');
+
+        if (string.IsNullOrWhiteSpace(path))
+            throw new MapValidationException("No file path was provided.");
+
+        if (!File.Exists(path))
+            throw new MapValidationException($"File not found: {path}");
+
+        return _parser.Parse(File.ReadAllText(path));
     }
 
     private Grid EnterMapManually()
