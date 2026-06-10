@@ -7,18 +7,10 @@ public class MapParserTests
 {
     private readonly MapParser _parser = new();
 
-    // The exact example from the assessment brief — our canonical map.
-    private const string BriefExample =
-        "S1 0 X 0 0 0 S2\n" +
-        "X 0 0 0 0 X 0\n" +
-        "X X 0 X 0 X 0\n" +
-        "0 X X 0 0 X 0\n" +
-        "0 X X 0 0 0 F";
-
     [Fact]
     public void Parses_the_brief_example_into_the_expected_grid()
     {
-        var grid = _parser.Parse(BriefExample);
+        var grid = _parser.Parse(TestMaps.BriefExample);
 
         Assert.Equal(5, grid.Rows);
         Assert.Equal(7, grid.Columns);
