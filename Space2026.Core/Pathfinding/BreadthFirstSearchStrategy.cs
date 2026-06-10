@@ -42,16 +42,7 @@ public sealed class BreadthFirstSearchStrategy : IPathfindingStrategy
     private static PathResult BuildResult(
         Grid grid, IReadOnlyDictionary<Position, Position> cameFrom, Position start, Position goal)
     {
-        var path = new List<Position> { goal };
-        var current = goal;
-
-        while (current != start)
-        {
-            current = cameFrom[current];
-            path.Add(current);
-        }
-
-        path.Reverse();
+        var path = PathReconstructor.Build(cameFrom, start, goal);
 
         // Cost = sum of entry costs of every cell stepped into (start excluded).
         var cost = 0;

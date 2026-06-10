@@ -30,7 +30,7 @@ public sealed class DijkstraStrategy : IPathfindingStrategy
                 continue;
 
             if (current == goal)
-                return PathResult.Success(currentCost, BuildPath(cameFrom, start, goal));
+                return PathResult.Success(currentCost, PathReconstructor.Build(cameFrom, start, goal));
 
             foreach (var next in grid.Neighbours(current))
             {
@@ -48,21 +48,5 @@ public sealed class DijkstraStrategy : IPathfindingStrategy
         }
 
         return PathResult.Failure();
-    }
-
-    private static IReadOnlyList<Position> BuildPath(
-        IReadOnlyDictionary<Position, Position> cameFrom, Position start, Position goal)
-    {
-        var path = new List<Position> { goal };
-        var current = goal;
-
-        while (current != start)
-        {
-            current = cameFrom[current];
-            path.Add(current);
-        }
-
-        path.Reverse();
-        return path;
     }
 }
