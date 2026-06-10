@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/RayaSergieva/space-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/RayaSergieva/space-2026/actions/workflows/ci.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-56_passing-4ade80)
+![Tests](https://img.shields.io/badge/tests-66_passing-4ade80)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 *Guiding astronauts home, one shortest path at a time.*
@@ -61,7 +61,7 @@ Requires the .NET 10 SDK.
 
 ```bash
 dotnet run --project Space2026.Console   # run the app
-dotnet test                              # run all 56 tests
+dotnet test                              # run all 66 tests
 ```
 
 Or open `Space2026.slnx` in Visual Studio 2026 and run `Space2026.Console`.
@@ -73,13 +73,16 @@ Or open `Space2026.slnx` in Visual Studio 2026 and run `Space2026.Console`.
 2. **Load a map from a file** - point it at any text file with one row of
    space-separated symbols per line (a ready-made map ships at
    `Space2026.Console/Maps/sample.txt`).
-3. **Enter a map manually** - type rows directly; every mission rule is
-   validated with a message naming the exact problem and position.
+3. **Enter a map manually** - declare M and N, then type the rows; every
+   mission rule is validated with a message naming the exact problem.
 4. **Generate a random map** - choose size, astronaut count and obstacle
    densities; generation re-rolls until astronaut S1 has a guaranteed route.
-5. **Choose algorithm** - swap BFS, Dijkstra and A* at runtime and watch
-   them agree (or, on debris, disagree) about the route.
-6. **Exit** - over and out.
+5. **Choose algorithm** - swap between five implementations (BFS, Dijkstra,
+   A*, and the flat-array optimized pair) at runtime and watch them agree
+   (or, on debris, disagree) about the route.
+6. **Benchmark the algorithms** - times all five on a seeded 100x100 map and
+   prints a comparison table (see Performance below).
+7. **Exit** - over and out.
 
 After every mission the app offers to email the report - see below.
 
@@ -135,7 +138,7 @@ mission.
 flowchart TB
     Console["🖥️ Space2026.Console<br/>menu · colours · route animation"]
     Core["🧩 Space2026.Core<br/>parsing · pathfinding · navigation · reporting<br/><i>zero external dependencies</i>"]
-    Tests["✅ Space2026.Tests<br/>56 tests · the brief pinned as executable spec"]
+    Tests["✅ Space2026.Tests<br/>66 tests · the brief pinned as executable spec"]
     Console -->|depends on| Core
     Tests -->|verifies| Core
 ```
@@ -155,23 +158,27 @@ flowchart LR
     D --> E["BFS<br/>fewest moves"]
     D --> F["Dijkstra ⭐ default<br/>cheapest cost"]
     D --> G["A*<br/>heuristic-guided"]
+    D --> K["Flat-array variants<br/>optimized Dijkstra · A*"]
     E --> H["NavigationService<br/>failures first · ascending cost"]
     F --> H
     G --> H
+    K --> H
     H --> I["🖥️ Animated console"]
     H --> J["📧 HTML email transmission"]
 
     style F fill:#facc15,stroke:#854f0b,color:#412402
 ```
 
-Three interchangeable algorithms sit behind one interface and can be swapped
+Five interchangeable algorithms sit behind one interface and can be swapped
 from the menu at runtime:
 
-| Algorithm | Optimises | When it is the right tool |
-|-----------|-----------|---------------------------|
-| Breadth-First Search | fewest **moves** | uniform step costs (no debris) |
+| Algorithm | Optimises | What distinguishes it |
+|-----------|-----------|-----------------------|
+| Breadth-First Search | fewest **moves** | the right tool only when step costs are uniform (no debris) |
 | Dijkstra ⭐ | lowest **total cost** | weighted terrain - the default |
-| A* | lowest total cost, fewer cells explored | same answer as Dijkstra, guided by an admissible Manhattan heuristic |
+| A* | lowest total cost | same answer, guided by an admissible Manhattan heuristic so it explores far fewer cells |
+| Dijkstra (optimized, flat arrays) | lowest total cost | same exploration, cheaper visits - int-indexed arrays replace hashed collections |
+| A* (optimized, flat arrays) | lowest total cost | both levers combined - see Performance for the honest, measured result |
 
 The difference is not academic. On this corridor, the straight route crosses
 three debris cells while a longer detour stays in open space:
@@ -183,6 +190,41 @@ S1 D D D F      straight through: 4 moves, total cost 7   (BFS picks this)
 
 A test pins both outcomes, documenting in executable form why Dijkstra is the
 default once debris exists.
+
+## 📊 Performance
+
+Menu option 6 benchmarks all five strategies on the same seeded 100x100 map
+(25% asteroids, 10% debris), 200 timed runs each after a JIT warm-up.
+Measured on the author's machine (.NET 10, Windows):
+
+```text
+Algorithm                              Avg / run   Speed vs Dijkstra   Path cost
+Breadth-First Search                    2551.7 us             1.48x          62
+Dijkstra (weighted)                     3766.9 us             1.00x          62
+A* (weighted, heuristic-guided)          610.3 us             6.17x          62
+Dijkstra (optimized, flat arrays)       1745.8 us             2.16x          62
+A* (optimized, flat arrays)             1228.1 us             3.07x          62
+```
+
+Three readings worth taking from the table:
+
+- **Every weighted strategy found the identical cost-62 route.** The
+  optimisations change the speed, never the answer - the cross-strategy
+  equivalence tests pin this, and the benchmark confirms it at scale.
+- **The two speed-ups are different levers.** The Manhattan heuristic prunes
+  the search (6.17x, by exploring far fewer cells); flat arrays make each
+  visit cheaper (2.16x, by replacing hashed collections with int-indexed
+  array reads).
+- **Combining them did not simply multiply.** The flat variants pay a fixed
+  per-call setup cost (building the 10,000-entry cost arrays before
+  searching), and on a heuristic-pruned search that tax outweighs part of
+  the savings - so plain A* remains the single-query champion here. Fewer
+  operations beat cheaper operations: a measured finding, not a guess. The
+  known fix is to cache the flat cost array on the `Grid` so it is built
+  once per map instead of once per query - left as the documented next rung.
+
+Figures are indicative `Stopwatch` averages; BenchmarkDotNet is the rigorous
+tool for production-grade measurement.
 
 ## 🎨 Design decisions worth noting
 
@@ -198,6 +240,10 @@ default once debris exists.
 - **Terrain and symbols stored separately.** Pathfinding reads terrain; the
   renderer echoes the original glyphs, so a map written with `0` renders back
   with `0` - byte-for-byte fidelity to the input.
+- **`O` and `0` both accepted.** The brief's legend defines open space as the
+  letter `O` while its worked example uses the digit `0`; the parser accepts
+  both (case-insensitively) and preserves whichever glyph the author wrote -
+  a documented decision on a spec ambiguity rather than a silent guess.
 - **The brief as a test fixture.** The worked example's costs (S2 = 4,
   S1 = 10) and annotated maps are pinned in tests, so any deviation from the
   specification is a red build, not an opinion.
@@ -207,7 +253,8 @@ default once debris exists.
 ## 🏆 Bonus objectives
 
 - ✅ **Space debris** - weighted pathfinding via Dijkstra / A*
-- ✅ **Swappable algorithms** - Strategy pattern, switchable at runtime
+- ✅ **Swappable algorithms** - Strategy pattern, five implementations,
+  switchable at runtime
 - ✅ **Random map generation** - seedable, with guaranteed solvability for S1
 - ✅ **Email report** - SMTP with a styled HTML "mission transmission"
 
@@ -243,21 +290,45 @@ classDiagram
         queue: priority by cost + Manhattan
     }
 
+    class OptimizedDijkstraStrategy {
+        storage: flat int arrays
+        queue: priority, lazy deletion
+    }
+
+    class OptimizedAStarStrategy {
+        storage: flat int arrays
+        queue: priority + Manhattan
+    }
+
     NavigationService o-- IPathfindingStrategy : injected
     IPathfindingStrategy <|.. BreadthFirstSearchStrategy
     IPathfindingStrategy <|.. DijkstraStrategy
     IPathfindingStrategy <|.. AStarStrategy
+    IPathfindingStrategy <|.. OptimizedDijkstraStrategy
+    IPathfindingStrategy <|.. OptimizedAStarStrategy
 ```
 
-56 xUnit tests mirror Core's structure: parser rule-by-rule rejection
+66 xUnit tests mirror Core's structure: parser rule-by-rule rejection
 messages, the brief's example as a byte-for-byte rendering fixture,
-cross-strategy equivalence (every algorithm must agree on optimal costs),
-seeded-determinism and solvability for the random generator, and the
+cross-strategy equivalence (every weighted algorithm must agree on optimal
+costs), agreement of both flat-array strategies with standard Dijkstra
+across 20 seeded random maps each (including unsolvable ones), seeded
+determinism and solvability for the random generator, and the
 BFS-vs-Dijkstra debris contrast. CI runs the suite on every push.
 
 ## 🔭 Next steps
 
-A flat-array `OptimizedDijkstraStrategy` (cell index = row × columns + col,
-arrays instead of hash sets) would drop in behind the same interface as a
-performance demonstration - the architecture was shaped so that this costs
-one new class and one menu line.
+The flat-array optimisation promised by earlier versions of this document is
+now built and benchmarked in-app (menu option 6). The remaining rungs on the
+performance ladder, deliberately left unclimbed:
+
+- **Cache the flat cost array on the `Grid`** - built once per map instead
+  of once per query, erasing the setup tax the benchmark exposed.
+- **Dial's algorithm** - with entry costs limited to {1, 2}, a bucket queue
+  replaces the binary heap for O(E) total work.
+- **BenchmarkDotNet** - statistically rigorous timing to replace the
+  indicative Stopwatch figures.
+
+Each would drop in behind the same `IPathfindingStrategy` interface - the
+architecture was shaped so that performance work costs one new class, not a
+rewrite.
