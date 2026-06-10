@@ -15,7 +15,7 @@ internal sealed class MissionConsole
     private readonly MapParser _parser = new();
 
     // Dijkstra is the default — optimal on weighted terrain (debris costs 2).
-    // Held as the interface so Phase 7's menu picker can swap algorithms freely.
+    // Held as the interface so the menu picker can swap algorithms freely.
     private IPathfindingStrategy _strategy = new DijkstraStrategy();
 
     public void Run()
@@ -35,12 +35,13 @@ internal sealed class MissionConsole
                     case "1": RunMission(LoadSampleMap()); break;
                     case "2": RunMission(LoadMapFromFile()); break;
                     case "3": RunMission(EnterMapManually()); break;
-                    case "4":
+                    case "4": ChooseAlgorithm(); break;
+                    case "5":
                         System.Console.WriteLine();
                         System.Console.WriteLine("Safe travels, commander.");
                         return;
                     default:
-                        System.Console.WriteLine("Unknown option — please choose 1-4.");
+                        System.Console.WriteLine("Unknown option — please choose 1-5.");
                         break;
                 }
             }
@@ -60,8 +61,28 @@ internal sealed class MissionConsole
         System.Console.WriteLine("  1) Run the sample mission (from the brief)");
         System.Console.WriteLine("  2) Load a map from a file");
         System.Console.WriteLine("  3) Enter a map manually");
-        System.Console.WriteLine("  4) Exit");
+        System.Console.WriteLine($"  4) Choose algorithm  (current: {_strategy.Name})");
+        System.Console.WriteLine("  5) Exit");
         System.Console.Write("> ");
+    }
+
+    private void ChooseAlgorithm()
+    {
+        var options = new IPathfindingStrategy[]
+        {
+            new DijkstraStrategy(),
+            new AStarStrategy(),
+            new BreadthFirstSearchStrategy()
+        };
+
+        System.Console.WriteLine();
+        for (var i = 0; i < options.Length; i++)
+            System.Console.WriteLine($"  {i + 1}) {options[i].Name}");
+        System.Console.Write("Select algorithm: ");
+
+        var choice = ReadInt(1, options.Length);
+        _strategy = options[choice - 1];
+        System.Console.WriteLine($"Algorithm set to {_strategy.Name}.");
     }
 
     private Grid LoadSampleMap()
