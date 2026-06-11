@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Space2026.Core.Generation;
+﻿using Space2026.Core.Generation;
 using Space2026.Core.Models;
 using Space2026.Core.Navigation;
 using Space2026.Core.Parsing;
@@ -11,7 +10,8 @@ namespace Space2026.Console;
 /// <summary>
 /// The interactive console application: shows the menu, gathers maps from the
 /// user, runs missions through the Core services and prints the report.
-/// Pure presentation - all mission logic lives in Space2026.Core.
+/// Pure presentation - all mission logic lives in Space2026.Core; input
+/// primitives live in ConsoleInput and the benchmark in AlgorithmBenchmark.
 /// </summary>
 internal sealed class MissionConsole
 {
@@ -40,7 +40,7 @@ internal sealed class MissionConsole
                     case "3": RunMission(EnterMapManually()); break;
                     case "4": RunMission(GenerateRandomMap()); break;
                     case "5": ChooseAlgorithm(); break;
-                    case "6": RunBenchmark(); break;
+                    case "6": AlgorithmBenchmark.Run(); break;
                     case "7":
                         System.Console.WriteLine();
                         System.Console.WriteLine("Safe travels, commander.");
@@ -85,10 +85,10 @@ internal sealed class MissionConsole
     private Grid EnterMapManually()
     {
         System.Console.Write("Number of rows (M): ");
-        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+        var rows = ConsoleInput.ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
 
         System.Console.Write("Number of columns (N): ");
-        var columns = ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
+        var columns = ConsoleInput.ReadInt(MapParser.MinDimension, MapParser.MaxDimension);
 
         System.Console.WriteLine($"Enter {rows} rows of {columns} space-separated symbols (S1-S3, F, O or 0, X, D):");
 
@@ -114,15 +114,15 @@ internal sealed class MissionConsole
     {
         System.Console.WriteLine("Press Enter at any prompt to accept the default.");
         System.Console.Write("Rows (M) [10]: ");
-        var rows = ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
+        var rows = ConsoleInput.ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
         System.Console.Write("Columns (N) [10]: ");
-        var cols = ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
+        var cols = ConsoleInput.ReadInt(MapParser.MinDimension, MapParser.MaxDimension, defaultValue: 10);
         System.Console.Write("Astronauts (1-3) [2]: ");
-        var count = ReadInt(1, MapParser.MaxAstronauts, defaultValue: 2);
+        var count = ConsoleInput.ReadInt(1, MapParser.MaxAstronauts, defaultValue: 2);
         System.Console.Write("Asteroid density % (0-60) [25]: ");
-        var asteroidPct = ReadInt(0, 60, defaultValue: 25);
+        var asteroidPct = ConsoleInput.ReadInt(0, 60, defaultValue: 25);
         System.Console.Write("Debris density % (0-30) [10]: ");
-        var debrisPct = ReadInt(0, 30, defaultValue: 10);
+        var debrisPct = ConsoleInput.ReadInt(0, 30, defaultValue: 10);
 
         try
         {
@@ -154,62 +154,9 @@ internal sealed class MissionConsole
             System.Console.WriteLine($"  {i + 1}) {options[i].Name}");
         System.Console.Write("Select algorithm: ");
 
-        var choice = ReadInt(1, options.Length);
+        var choice = ConsoleInput.ReadInt(1, options.Length);
         _strategy = options[choice - 1];
         System.Console.WriteLine($"Algorithm set to {_strategy.Name}.");
-    }
-
-    private static void RunBenchmark()
-    {
-        const int iterations = 200;
-
-        System.Console.WriteLine();
-        System.Console.WriteLine("Benchmark: seeded 100x100 map, 25% asteroids, 10% debris, 200 runs per algorithm.");
-        System.Console.WriteLine("Generating the map and warming up the JIT...");
-
-        var grid = new RandomMapGenerator(seed: 2026).Generate(
-            rows: 100, columns: 100, astronautCount: 1,
-            asteroidDensity: 0.25, debrisDensity: 0.10, ensureSolvable: true);
-        var start = grid.Astronauts[0].Start;
-
-        var strategies = new IPathfindingStrategy[]
-        {
-            new BreadthFirstSearchStrategy(),
-            new DijkstraStrategy(),
-            new AStarStrategy(),
-            new OptimizedDijkstraStrategy(),
-            new OptimizedAStarStrategy()
-        };
-
-        // Warm-up so the JIT compiles every code path before timing starts.
-        foreach (var strategy in strategies)
-            strategy.FindShortestPath(grid, start, grid.Station);
-
-        var measurements = new List<(string Name, double Microseconds, int Cost)>();
-        foreach (var strategy in strategies)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-
-            var stopwatch = Stopwatch.StartNew();
-            var cost = 0;
-            for (var i = 0; i < iterations; i++)
-                cost = strategy.FindShortestPath(grid, start, grid.Station).Cost;
-            stopwatch.Stop();
-
-            measurements.Add((strategy.Name, stopwatch.Elapsed.TotalMicroseconds / iterations, cost));
-        }
-
-        var baseline = measurements[1].Microseconds; // standard Dijkstra
-
-        System.Console.WriteLine();
-        System.Console.WriteLine($"{"Algorithm",-36}{"Avg / run",12}{"Speed vs Dijkstra",20}{"Path cost",12}");
-        foreach (var (name, microseconds, cost) in measurements)
-            System.Console.WriteLine($"{name,-36}{microseconds,9:F1} us{baseline / microseconds,18:F2}x{cost,12}");
-
-        System.Console.WriteLine();
-        System.Console.WriteLine("Higher x = faster. BFS may show a higher cost: it minimises moves, not cost.");
-        System.Console.WriteLine("Indicative Stopwatch figures; BenchmarkDotNet is the rigorous tool for production work.");
     }
 
     private Grid LoadSampleMap()
@@ -277,7 +224,7 @@ internal sealed class MissionConsole
             var sender = (System.Console.ReadLine() ?? "").Trim();
 
             System.Console.Write("  Sender password (Gmail requires an app password, not your real one): ");
-            var password = ReadPassword();
+            var password = ConsoleInput.ReadPassword();
 
             System.Console.Write("  Receiver email: ");
             var receiver = (System.Console.ReadLine() ?? "").Trim();
@@ -292,49 +239,6 @@ internal sealed class MissionConsole
         {
             // Network/auth failures shouldn't crash the app - report and return.
             System.Console.WriteLine($"  Could not send email: {ex.Message}");
-        }
-    }
-
-    private static string ReadPassword()
-    {
-        var password = new System.Text.StringBuilder();
-        while (true)
-        {
-            var key = System.Console.ReadKey(intercept: true);
-            if (key.Key == ConsoleKey.Enter) { System.Console.WriteLine(); break; }
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (password.Length > 0) password.Remove(password.Length - 1, 1);
-                continue;
-            }
-            if (!char.IsControl(key.KeyChar)) password.Append(key.KeyChar);
-        }
-        return password.ToString();
-    }
-
-    private static int ReadInt(int min, int max)
-    {
-        while (true)
-        {
-            if (int.TryParse(System.Console.ReadLine(), out var value) && value >= min && value <= max)
-                return value;
-
-            System.Console.Write($"Please enter a whole number between {min} and {max}: ");
-        }
-    }
-
-    private static int ReadInt(int min, int max, int defaultValue)
-    {
-        while (true)
-        {
-            var input = (System.Console.ReadLine() ?? "").Trim();
-            if (input.Length == 0)
-                return defaultValue;
-
-            if (int.TryParse(input, out var value) && value >= min && value <= max)
-                return value;
-
-            System.Console.Write($"Please enter a whole number between {min} and {max} (or Enter for {defaultValue}): ");
         }
     }
 }
