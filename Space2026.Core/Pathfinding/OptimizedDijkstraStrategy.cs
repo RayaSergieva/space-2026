@@ -12,7 +12,7 @@ namespace Space2026.Core.Pathfinding;
 /// is stale and skipped). Identical results to DijkstraStrategy, verified by
 /// the cross-strategy equivalence tests; only the constant factor changes.
 /// With edge weights limited to {1, 2}, a Dial's bucket queue could replace
-/// the heap for O(E) total - left as the documented next rung, since at this
+/// the heap for O(E) total and left as the documented next rung, since at this
 /// grid size the heap is no longer the bottleneck.
 /// </summary>
 public sealed class OptimizedDijkstraStrategy : IPathfindingStrategy

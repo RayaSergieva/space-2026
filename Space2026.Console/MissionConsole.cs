@@ -56,6 +56,15 @@ internal sealed class MissionConsole
                 System.Console.WriteLine();
                 System.Console.WriteLine($"Invalid map: {ex.Message}");
             }
+            catch (Exception ex)
+            {
+                // Last resort: an unexpected failure should never kill the menu.
+                // Known cases are translated into friendly errors at their
+                // source; this names whatever slips through and keeps
+                // mission control open.
+                System.Console.WriteLine();
+                System.Console.WriteLine($"Unexpected error ({ex.GetType().Name}): {ex.Message}");
+            }
         }
     }
 
@@ -224,7 +233,22 @@ internal sealed class MissionConsole
         if (!File.Exists(path))
             throw new MapValidationException($"File not found: {path}");
 
-        return _parser.Parse(File.ReadAllText(path));
+        try
+        {
+            return _parser.Parse(File.ReadAllText(path));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Known failure, translated at the source into the friendly
+            // channel - the loop's catch-all stays for the truly unforeseen.
+            throw new MapValidationException(
+                $"Permission denied reading: {path}. Check the file's access rights and try again.");
+        }
+        catch (IOException ex)
+        {
+            throw new MapValidationException(
+                $"The file could not be read - it may be locked by another program. Details: {ex.Message}");
+        }
     }
 
     private void RunMission(Grid grid)
