@@ -239,6 +239,10 @@ tool for production-grade measurement.
 - **Terrain and symbols stored separately.** Pathfinding reads terrain; the
   renderer echoes the original glyphs, so a map written with `0` renders back
   with `0` - byte-for-byte fidelity to the input.
+- **Two presentations, one truth.** The interactive console pads every cell
+  to two characters so wide labels (`S1`) keep their columns aligned; the
+  brief's single-spaced format is preserved verbatim in the plain-text
+  report, where tests pin it byte-for-byte against the worked example.
 - **`O` and `0` both accepted.** The brief's legend defines open space as the
   letter `O` while its worked example uses the digit `0`; the parser accepts
   both (case-insensitively) and preserves whichever glyph the author wrote -
