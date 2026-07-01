@@ -26,8 +26,7 @@ A C# / .NET 10 console application that guides stranded astronauts across a
 cosmic map to the Space Station by the cheapest possible route - avoiding
 asteroids and paying double to push through space debris.
 
-Built for the Hitachi Solutions Europe technical assessment, with an emphasis
-on clean architecture, test-driven correctness, and an honest commit history:
+Built with emphasis on clean architecture, test-driven correctness, and an honest commit history:
 the repository was built incrementally, and the log reads as the story of the
 design.
 
